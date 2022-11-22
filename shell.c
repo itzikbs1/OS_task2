@@ -63,7 +63,6 @@ void shell_initialize(){
 
 }
 
-
 void user_input(char *input){
 
         // Exit shell case:
@@ -139,27 +138,64 @@ void user_input(char *input){
         if(strncmp(input, "|", 1) == 0){
             // printf("%d", 128);
             input += 2;
-            int i;
-            for(i=1; i<size-1; i++)
-            {
-                int pd[2];
-                pipe(pd);
-
-                if (!fork()) {
-                    dup2(pd[1], 1); // remap output back to parent
-                    execlp(input[i], input[i], NULL);
-                    perror("exec");
-                    abort();
-                }
-
-                // remap output from previous child to input
-                dup2(pd[0], 0);
-                close(pd[1]);
+            int fd[2];
+            if (pipe(fd) == -1){
+                printf("cannot opening the pipe\n");
+                return 1;
             }
+            int pid1 = fork();
+            if (pid1 < 0)
+            {
+                return 3;
+            }
+            
+            if (pid1 == 0)
+            {
+                dup2(fd[1], STDOUT_FILENO);
+                close(fd[0]);
+                
+                // write(fd[1], &left, sizeof(char*));
+                close(fd[1]);
+                execlp(left, NULL);
+            // }else{
+            //     close(fd[1]);
+            //     read(fd[0], &input, sizeof(char*));
+            //     close(fd[0]);
+            }
+            
+            int pid2 = fork();
+            if (pid2 < 0){
+                return 3;
+            }
+            if (pid2 == 0)
+            {
+                dup2(fd[0], STDIN_FILENO);
+                close(fd[0]);
+                close(fd[1]);
+                execlp(input, NULL);
+            }
+            
+            // int i;
+            // for(i=1; i<size-1; i++)
+            // {
+            //     int pd[2];
+            //     pipe(pd);
 
-            execlp(left, left, NULL);
-            perror("exec");
-            abort();
+            //     if (!fork()) {
+            //         dup2(pd[1], 1); // remap output back to parent
+            //         execlp(input[i], input[i], NULL);
+            //         perror("exec");
+            //         abort();
+            //     }
+
+            //     // remap output from previous child to input
+            //     dup2(pd[0], 0);
+            //     close(pd[1]);
+            // }
+
+            // execlp(left, left, NULL);
+            // perror("exec");
+            // abort();
             return;
         }
         if(strncmp(input, ">", 1) == 0){
