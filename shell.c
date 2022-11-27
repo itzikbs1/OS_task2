@@ -65,167 +65,45 @@ void shell_initialize(){
 
 void user_input(char *input){
 
-        // Exit shell case:
-        // if(strcmp(input,"EXIT") == 0){
-        //     printf("Exiting shell, good bye ...\n");
-        //     free(input);
-        //     sleep(1);
-        //     exit(1);
-        // }
-        // get directory case:
-        // if(strcmp(input,"pwd") == 0){
-        //     // get_curr_directory();
-        //     printf("\n");
-        //     return;
-        // }
-        
-        // open a tcp localhost, we are client.
-        // if(strcmp(input,"TCP PORT") == 0){
-
-        //     /* Try to auto start server failure :( */
-        //     // const char *run_server = "gnome-terminal --command=\"./Server\" ";
-        //     // system(run_server);
-        //     // sleep(1);
-
-        //     open_tcp_socket();
-        //     dup2(1,1234);
-        //     dup2(cli_sock,1);
-        //     tcp_connections++;
-        //     return;
-        // }
-
-        // close the client socket.
-        // if(strcmp(input,"LOCAL") == 0 && tcp_connections>0 ){
-        //     /*Tells the server to close connection*/
-        //     printf("Exit\n");
-        //     sleep(1);
-
-        //     close(cli_sock);
-        //     dup2(1234,1);
-        //     tcp_connections = 0; 
-        //     return;
-        // }
         if(strcmp(input,"DIR") == 0){
             show_library_files();
             return;
         }
-
-        //handle cd case:
-        //this line checks if a string starts with 'CD'
-        // if(strncmp(input,"CD",2) == 0){
-        //     change_directory(input);
-        //     return;
-        // }
-        
         //handle copy case:
         //this line checks if a string starts with 'COPY'
         if(strncmp(input,"COPY",4) == 0){
             copy_from_src_to_dst(input);
-            return;
+            return;     
         }
-        char left[MAXSIZE];
-        int idx=0;
-        int size = strlen(input);
-        // printf("%d", 128);
-        while ((*input) != ' ')
-        {
-            // printf("%d", 131);
-            left[idx] = (*input);
-            idx++;
-            input++;
-        }
-        input++;
-        if(strncmp(input, "|", 1) == 0){
-            // printf("%d", 128);
-            input += 2;
-            int fd[2];
-            if (pipe(fd) == -1){
-                printf("cannot opening the pipe\n");
-                return 1;
-            }
-            int pid1 = fork();
-            if (pid1 < 0)
-            {
-                return 3;
-            }
-            
-            if (pid1 == 0)
-            {
-                dup2(fd[1], STDOUT_FILENO);
-                close(fd[0]);
-                
-                // write(fd[1], &left, sizeof(char*));
-                close(fd[1]);
-                execlp(left, NULL);
-            // }else{
-            //     close(fd[1]);
-            //     read(fd[0], &input, sizeof(char*));
-            //     close(fd[0]);
-            }
-            
-            int pid2 = fork();
-            if (pid2 < 0){
-                return 3;
-            }
-            if (pid2 == 0)
-            {
-                dup2(fd[0], STDIN_FILENO);
-                close(fd[0]);
-                close(fd[1]);
-                execlp(input, NULL);
-            }
-            
-            // int i;
-            // for(i=1; i<size-1; i++)
-            // {
-            //     int pd[2];
-            //     pipe(pd);
-
-            //     if (!fork()) {
-            //         dup2(pd[1], 1); // remap output back to parent
-            //         execlp(input[i], input[i], NULL);
-            //         perror("exec");
-            //         abort();
-            //     }
-
-            //     // remap output from previous child to input
-            //     dup2(pd[0], 0);
-            //     close(pd[1]);
-            // }
-
-            // execlp(left, left, NULL);
-            // perror("exec");
-            // abort();
-            return;
-        }
-        if(strncmp(input, ">", 1) == 0){
-            input += 2;
-            // int file_src = ;
-            int file_desc = open(input, O_WRONLY | O_APPEND);
-            int file_src = open(left, O_WRONLY | O_APPEND);
-            if(file_desc < 0)
-                printf("Error opening the file_desc\n");
-
-            if(file_src < 0)
-                printf("Error opening the file_src\n");
-            
-            int copy_desc = dup(file_desc);
-            int copy_src = dup(file_src);
-        }
-
-        // handle echo msg case:
-        // this line checks if a string starts with 'ECHO'
-        // if(strncmp(input,"ECHO",4) == 0){
-        //     print_echo_msg(input);
-        //     printf("\n");
-        //     return;
+        // char left[MAXSIZE];
+        // int idx=0;
+        // int size = strlen(input);
+        // while ((*input) != ' ')
+        // {
+        //     left[idx] = (*input);
+        //     idx++;
+        //     input++;
         // }
+        // input++;
+        // printf("left %s", left);
+        // printf("input %s ", input);
+        // if(strncmp(input, "|", 1) == 0){
+        //     // input += 2;
+        //     execArgsPiped(left, input);
+        // }
+        // if(strncmp(input, ">", 1) == 0){
+        //     input += 2;
+        //     // int file_src = ;
+        //     int file_desc = open(input, O_WRONLY | O_APPEND);
+        //     int file_src = open(left, O_WRONLY | O_APPEND);
+        //     if(file_desc < 0)
+        //         printf("Error opening the file_desc\n");
 
-        // // handle delete file case:
-        // // this line checks if a string starts with 'DELETE'
-        // if(strncmp(input,"DELETE",6) == 0){
-        //     delete_file(input);
-        //     return;
+        //     if(file_src < 0)
+        //         printf("Error opening the file_src\n");
+            
+        //     int copy_desc = dup(file_desc);
+        //     int copy_src = dup(file_src);
         // }
 
         /**
@@ -238,8 +116,138 @@ void user_input(char *input){
         return;
         
 }
+// function for finding pipe
+int parsePipe(char* str, char** strpiped)
+{
+    int i;
+    for (i = 0; i < 2; i++) {
+        strpiped[i] = strsep(&str, "|");
+        if (strpiped[i] == NULL)
+            break;
+    }
+  
+    if (strpiped[1] == NULL)
+        return 0; // returns zero if no pipe is found.
+    else {
+        return 1;
+    }
+}
+// function for parsing command words
+void parseSpace(char* str, char** parsed)
+{
+    int i;
+  
+    for (i = 0; i < 100; i++) {
+        parsed[i] = strsep(&str, " ");
+  
+        if (parsed[i] == NULL)
+            break;
+        if (strlen(parsed[i]) == 0)
+            i--;
+    }
+}
+  
+int processString(char* str, char** parsed, char** parsedpipe)
+{
+  
+    char* strpiped[2];
+    int piped = 0;
+  
+    piped = parsePipe(str, strpiped);
+    printf("piped %d \n", piped);
+    if (piped) {
+        parseSpace(strpiped[0], parsed);
+        parseSpace(strpiped[1], parsedpipe);
+  
+    } else {
+        
+        parseSpace(str, parsed);
+    }
+  
+    // if (ownCmdHandler(parsed))
+    //     return 0;
+    // else
+    return 1 + piped;
+}
+void execArgsPiped(char** parsed, char** parsedpipe)
+{
+    printf("174\n");
+    printf("parsed %s%s \n", parsed);
+    printf("parsedpipe %s%s \n", parsedpipe);
+    // exit(1);
+    // 0 is read end, 1 is write end
+    int pipefd[2]; 
+    pid_t p1, p2;
+    printf("177\n");
+    // exit(1);
+    if (pipe(pipefd) < 0) {
+        printf("184");
+        printf("\nPipe could not be initialized");
+        return;
+    }
+    p1 = fork();
+    if (p1 < 0) {
+        printf("189");
+        printf("\nCould not fork");
+        return;
+    }
+    // exit(1);
+    if (p1 == 0) {
+        printf("195");
+        // Child 1 executing..
+        // It only needs to write at the write end
+        // sleep(5);
+        exit(1);
+        printf("pipefd[0] %d ", pipefd[0]);
+        printf("pipefd[1] %d ", pipefd[1]);
+        sleep(5);
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[1]);
+        printf("parsed[0] %s", parsed[0]);
+        printf("parsed %s%s ", parsed);
+        // exit(1);
+        if (execvp(parsed[0], parsed) < 0) {
+            printf("\nCould not execute command 1..");
+            exit(0);
+        }
+        // exit(1);
+    } else {
+        printf("201");
+        // Parent executing
+        p2 = fork();
+  
+        if (p2 < 0) {
+            printf("\nCould not fork");
+            return;
+        }
+  
+        // Child 2 executing..
+        // It only needs to read at the read end
+        if (p2 == 0) {
+            printf("212");
+            close(pipefd[1]);
+            dup2(pipefd[0], STDIN_FILENO);
+            close(pipefd[0]);
+            // printf("parsedpipe[0] %s ", parsedpipe[0]);
+            // printf("parsedpipe %s ", parsedpipe);
+            if (execvp(parsedpipe[0], parsedpipe) < 0) {
+                printf("219");
+                printf("\nCould not execute command 2..");
+                exit(0);
+            }
+        } else {
+            printf("222");
+            // parent executing, waiting for two children
+            wait(NULL);
+            wait(NULL);
+        }
+    }
+    // exit(1);
+    // return;
+}
 char *split_input[MAXSIZE];
-void manual_system_calls(char *input){
+void manual_system_calls(char *input){//check what its do.
 
     split(input);
 
@@ -252,7 +260,7 @@ void manual_system_calls(char *input){
     }else if (process_id == 0){
         /* child process */
         execvp(split_input[0], split_input);
-    }else{
+    }else{   
         /* Parent Process */
         wait(NULL);
     }
@@ -461,8 +469,10 @@ void print_echo_msg(char *return_echo){
 
 void main(){
 
-    // printf("%d", 376);
-    char *inputString ;
+    char inputstring[1000], *parsedArgs[100];
+    char* paredArgsPiped[100];
+    int execFlag = 0;
+    char *inputString;
     inputString = (char*) malloc(MAXSIZE*sizeof(char));
     shell_initialize();
     // printf("%s", "380");
@@ -470,52 +480,39 @@ void main(){
     uname(&os_type); // name finds.
 
     while(TRUE){
-
-        // printf("%d", 384);
-        // printf("%s", argv[1]);
-        // if (strcmp(argv[1], "|") == 0){
-        // int i;
-        // for( i=1; i<argc-1; i++)
-        // {
-        //     int pd[2];
-        //     pipe(pd);
-
-        //     if (!fork()) {
-        //         dup2(pd[1], 1); // remap output back to parent
-        //         execlp(argv[i], argv[i], NULL);
-        //         perror("exec");
-        //         abort();
-        //     }
-
-        //     // remap output from previous child to input
-        //     dup2(pd[0], 0);
-        //     close(pd[1]);
-        // }
-
-        // execlp(argv[i], argv[i], NULL);
-        // perror("exec");
-        // abort();
-        //     }
-        
-        // printf(GREEN); // change color to green
-        // printf("%s", "387");
+  
         printf("%s",getenv("USER")); // username.
-        // printf("%s", "388");
-        printf("@%s",os_type.nodename); // os 
-        // printf("%s", "389");
-        // printf(WHITE); // changes to the basic color.
+        printf("@%s",os_type.nodename);
         printf(":");
-        // printf(PURPLE); // change color to purple
         printf("~");
-        // get_curr_directory(); //directory
         printf("$ ");
 
-        // printf(WHITE); // changes to the basic color.
-        /*using fgets so it will include spaces, etc..*/
+        // printf("inputstring%s ", inputstring);
+        // printf("parsedArgs%s%s ", parsedArgs);
+        // printf("pa")
+        
         bzero(inputString, strlen(inputString));
         fgets(inputString,MAXSIZE,stdin);
         inputString[strcspn(inputString,"\n")] = 0;
-        user_input(inputString);
+        printf("inputString %s\n", inputString);
+        execFlag = processString(inputString, parsedArgs, paredArgsPiped);
+        printf("parsedArgs %s\n", parsedArgs);
+        printf("paredArgsPiped %s\n ", paredArgsPiped);
+        printf("execFlag %d \n", execFlag);
+        if (execFlag == 2)
+        {
+            printf("535\n");
+            execArgsPiped(parsedArgs, paredArgsPiped);
+            printf("484");
+            exit(1);
+            return;
+            // continue;;
+        }
+        if(execFlag == 1){
+            printf("493");
+            user_input(inputString);
+        }
     }
     free(inputString);
+
 }
