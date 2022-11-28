@@ -1,1 +1,20 @@
-Wed 16 Nov 15:24:47 IST 2022
+a.out
+client.c
+f.txt
+gfg
+history.txt
+lib_shell.a
+Makefile
+mytee.c
+nc.c
+s
+s.c
+Server
+server.c
+server.o
+sh
+sh.c
+shell
+shell.c
+shell.o
+z.txt
