@@ -1,14 +1,4 @@
-/**
- * @file Shell.c
- * @author Shaked Levi, Lior Nagar
- * @brief This program is a Shell project, it will have some basic options like the shell does.
- * includes -> pwd,ls,cd ..., for further details ,enter the "Help" keyword in the program.
- * @version 0.1
- * @date 2022-03-21
- * 
- * @copyright Copyright (c) 2022
- * 
- */
+
 
 // #include <unistd.h>
 #include <fcntl.h>
