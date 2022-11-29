@@ -12,12 +12,14 @@
 
 // #include <unistd.h>
 #include <fcntl.h>
-
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#define SA struct sockaddr
 
 #include <sys/utsname.h>
 #include <sys/types.h>
@@ -28,27 +30,18 @@
 #include <sys/socket.h>
 
 #include <dirent.h> // for directory files 
-
-// #include "Shell.h"
-
+// #include "server.c"
 #include<stdio.h>
 #include<string.h>
 #include<stdlib.h>
 #include<unistd.h>
 #include<sys/types.h>
 #include<sys/wait.h>
-#include<readline/readline.h>
-#include<readline/history.h>
 /* method to clear the shell. */
 #define clear() printf("\033[H\033[J]")
 
-/* Colors */
-#define GREEN "\033[0;32m"
-#define PURPLE "\033[0;35m"
-#define WHITE "\033[0m"
-
 /*
-use with redirection(< > >>) to indicate to the function in which mode to open the file
+use with redirection(< > ) to indicate to the function in which mode to open the file
 and to know that redirection of the input OR output has to be done
 */
 #define INPUT 0
@@ -59,90 +52,45 @@ and to know that redirection of the input OR output has to be done
 #define TRUE 1
 #define FALSE 0
 #define MAXSIZE 256
-#define PORT 5555
-#define LOCALHOST "0.0.0.0"
 int cli_sock;
-int tcp_connections = 0; // i use this to not let the user enter LOCAL only after the client opened a tcp connection
 
-void shell_initialize(){
-    clear();
-    
-    // user greetings : 
-    printf("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
 
-    // user handle :
-    char* username = getenv("USER");
-    printf("\n\n\nUSER:@%s", username);
-    printf("\n");
-    sleep(3); // TODO: make a bind to enter, in order to acess shell.
-    clear();
 
+
+void func(int connfd)
+{
+    char buff[80];
+    int n;
+    for (;;) {
+        bzero(buff, 80);
+   
+        read(connfd, buff, sizeof(buff));
+        printf("From client: %s\t To client: ", buff);
+        bzero(buff, 80);
+        n = 0;
+        while ((buff[n++] = getchar()) != '\n');
+   
+        write(connfd, buff, sizeof(buff));
+   
+        if (strncmp("exit", buff, 4) == 0) {
+            printf("Server Exit...\n");
+            break;
+        }
+    }
 }
 
-void user_input(char *input){
-
-        if(strcmp(input,"DIR") == 0){
-            show_library_files();
-            return;
-        }
-        //handle copy case:
-        //this line checks if a string starts with 'COPY'
-        if(strncmp(input,"COPY",4) == 0){
-            copy_from_src_to_dst(input);
-            return;     
-        }
-        // char left[MAXSIZE];
-        // int idx=0;
-        // int size = strlen(input);
-        // while ((*input) != ' ')
-        // {
-        //     left[idx] = (*input);
-        //     idx++;
-        //     input++;
-        // }
-        // input++;
-        // printf("left %s", left);
-        // printf("input %s ", input);
-        // if(strncmp(input, "|", 1) == 0){
-        //     // input += 2;
-        //     execArgsPiped(left, input);
-        // }
-        // if(strncmp(input, ">", 1) == 0){
-        //     input += 2;
-        //     // int file_src = ;
-        //     int file_desc = open(input, O_WRONLY | O_APPEND);
-        //     int file_src = open(left, O_WRONLY | O_APPEND);
-        //     if(file_desc < 0)
-        //         printf("Error opening the file_desc\n");
-
-        //     if(file_src < 0)
-        //         printf("Error opening the file_src\n");
-            
-        //     int copy_desc = dup(file_desc);
-        //     int copy_src = dup(file_src);
-        // }
-
-        /**
-         * @brief in case everything else is not accsesed, we will invoke system calls.
-         *  system is a 'library method' which invokes the desired system call given the input.
-         */
-        // system(input);
-
-        manual_system_calls(input);
-        return;
-        
-}
 /*
-removes the newline and space character from the end and start of a char*
+    removes the newline and space character from the end and start of a char*
 */
 void removeWhiteSpace(char* buf){
 	if(buf[strlen(buf)-1]==' ' || buf[strlen(buf)-1]=='\n')
 	buf[strlen(buf)-1]='\0';
 	if(buf[0]==' ' || buf[0]=='\n') memmove(buf, buf+1, strlen(buf));
 }
+
 /*
-tokenizes char* buf using the delimiter c, and returns the array of strings in param
-and the size of the array in pointer nr
+    tokenizes char* buf using the delimiter c, and returns the array of strings in param
+    and the size of the array in pointer nr
 */
 void tokenize_buffer(char** param,int *nr,char *buf,const char *c){
 	char *token;
@@ -157,13 +105,99 @@ void tokenize_buffer(char** param,int *nr,char *buf,const char *c){
 	param[++pc]=NULL;
 	*nr=pc;
 }
-/*
-loads and executes a series of external commands that are piped together
-*/
-void executePiped(char** buf,int nr){//can support up to 10 piped commands
-	if(nr>10) return;
+
+///////////////////// DIR - Q1 //////////////////////
+
+void show_library_files(){
+
+    DIR *folder_contents;
+    struct dirent *file_name;
+    int idx = 1;
+    struct stat is_runnable;
+
+    folder_contents = opendir(".");
+    if(folder_contents == NULL){
+        printf("Unable to read from directory");
+        return;
+    }else{
+        while( (file_name = readdir(folder_contents))){
+            if (stat(file_name->d_name, &is_runnable) == 0 && is_runnable.st_mode & S_IXUSR){ 
+                if(strncmp(file_name->d_name,".",1) == 0){
+                    printf("%s\n",file_name->d_name);
+                }else{
+                    printf("%s\n",file_name->d_name);
+                }
+            }
+            else {
+                printf("%s\n",file_name->d_name);
+            }
+                
+            
+            idx++;
+        }
+    }
+
+    free(file_name);
+    closedir(folder_contents);
+}
+
+//////////////// COPY - Q2 //////////////////////
+
+void copy_from_src_to_dst(char *src, char* dst){
+    size_t size;
+    char buf[BUFSIZ];
+    FILE *src_file = fopen(src,"r");
+    if(src_file == NULL){
+        printf("Failed to open src file..\n");
+        return;
+    }
+    FILE *dst_file = fopen(dst,"w");
+    if(dst_file == NULL){
+        printf("Failed to open dest file..\n");
+        return;
+    }
+    //reading and writing to the new file.
+    size = fread(buf, 1, BUFSIZ, src_file);
+    while (size > 0) {
+        fwrite(buf, 1, size, dst_file);
+        size = fread(buf, 1, BUFSIZ, src_file);
+    }
+    free(src);
+    free(dst);
+
+    fclose(src_file);
+    fclose(dst_file);
+
+}
+
+////////////////////// ORIGINAL LINUK COMMAND -Q3 ////////////// 
+
+void original(char **buf){//check what its do.
+
+    /* forks a new child */
+    int process_id = fork();
+
+    if(process_id < 0) {
+        /* error case */
+        return; 
+    }else if (process_id == 0){
+        /* child process */
+        execvp(buf[0], buf);
+    }else{   
+        /* Parent Process */
+        wait(NULL);
+    }
+    return;
+}
+
+
+//////////////////// PIPE - Q4a and Q4b ////////////////
+
+void executePiped(char** buf,int nr){ //can support up to 8 piped commands (CHACK IF ITS OK FOR NEZER)
+	if(nr>8)
+         return;
 	
-	int fd[10][2],i,pc;
+	int fd[8][2],i,pc;
 	char *argv[100];
 
 	for(i=0;i<nr;i++){
@@ -199,29 +233,10 @@ void executePiped(char** buf,int nr){//can support up to 10 piped commands
 	}
 }
 
-/*
-loads and executes a series of external commands that have to be run asyncronously
-*/
-void executeAsync(char** buf,int nr){
-	int i,pc;
-	char *argv[100];
-	for(i=0;i<nr;i++){
-		tokenize_buffer(argv,&pc,buf[i]," ");
-		if(fork()==0){
-			execvp(argv[0],argv);
-			perror("invalid input ");
-			exit(1);//in case exec is not successfull, exit
-		}
-	}
-	for(i=0;i<nr;i++){
-		wait(NULL);
-	}
 
-}
 
-/*
-loads and executes a an external command that needs file redirection(input, output or append)
-*/
+////////////////////// REDIRECTION -Q5 ////////////// 
+
 void executeRedirect(char** buf,int nr,int mode){
 	int pc,fd;
 	char *argv[100];
@@ -254,177 +269,15 @@ void executeRedirect(char** buf,int nr,int mode){
 	wait(NULL);
 }
 
-/*
-shows the internal help
-*/
-char *split_input[MAXSIZE];
-void manual_system_calls(char *input){//check what its do.
-
-    split(input);
-
-    /* forks a new child */
-    int process_id = fork();
-
-    if(process_id < 0) {
-        /* error case */
-        return; 
-    }else if (process_id == 0){
-        /* child process */
-        execvp(split_input[0], split_input);
-    }else{   
-        /* Parent Process */
-        wait(NULL);
-    }
-    return;
-}
-
-void split(char *input){
-    char* tmp_input;
-    unsigned int i = 0;
-    tmp_input = strtok(input," ");
-    while(tmp_input != NULL){
-        split_input[i] = tmp_input;
-        ++i;
-        tmp_input = strtok(NULL," ");
-    }
-    return;
-}
-
-void delete_file(char *delete_input){
-    /** 
-     * i forwad the pointer by 7.
-     * this is because i do not need substring 'DELETE'.
-     */
-    delete_input+=7;
-    unlink(delete_input);
-}
-
-void copy_from_src_to_dst(char *copy_input){
-    /** 
-     * i forwad the pointer by 5.
-     * this is because i do not need substring 'COPY'.
-     */
-    copy_input+=5;
-
-    // extract the src location.
-    char *src, *handle_src;
-    src = (char*)malloc(sizeof(char)*256);
-    handle_src = src;
-    if(src == NULL){
-        printf("Memory allocation failed for src");
-    }
-    while(*copy_input != ' '){
-        *handle_src = *copy_input;
-        handle_src++;
-        copy_input++;
-    }
-    *handle_src = '\0';
-
-    copy_input++; // skip the ' ' 
-
-    // extract the dst location
-    char *dst, *handle_dst;
-    dst = (char*)malloc(sizeof(char)*256);
-    handle_dst = dst;
-    if(dst == NULL){
-        printf("Memory allocation failed for src");
-    }
-    
-    while(*copy_input != '\0'){
-        *handle_dst = *copy_input;
-        handle_dst++;
-        copy_input++;
-    }
-    *handle_dst = '\0';
-    printf("%s\n",src);
-    printf("%s\n",dst);
-    // Copying the file:
-    size_t size;
-    char buf[BUFSIZ];
-    FILE *src_file = fopen(src,"r");
-    if(src_file == NULL){
-        printf("Failed to open src file..\n");
-        return;
-    }
-    FILE *dst_file = fopen(dst,"w");
-    if(dst_file == NULL){
-        printf("Failed to open dest file..\n");
-        return;
-    }
-
-//COPY /home/shaked/Desktop/OS-Course/Shell/Txt /home/shaked/Desktop/OS-Course/Shell/Txt2 
-    //reading and writing to the new file.
-    size = fread(buf, 1, BUFSIZ, src_file);
-    while (size > 0) {
-        fwrite(buf, 1, size, dst_file);
-        size = fread(buf, 1, BUFSIZ, src_file);
-    }
-    free(src);
-    // free(handle_src);
-    free(dst);
-    // free(handle_dst);
-
-    fclose(src_file);
-    fclose(dst_file);
-
-}
-
-void change_directory(char *cd_input){
-    /** 
-     * i forwad the pointer by 3.
-     * this is because i do not need substring 'cd'.
-     */
-    cd_input+=3;
-    if(chdir(cd_input) != 0){
-        printf("cd: no such file or directory: %s\n",cd_input);
-    }
-}
 
 
-void show_library_files(){
 
-    DIR *folder_contents;
-    struct dirent *file_name;
-    int idx = 1;
-    struct stat is_runnable;
+//////////////////////// TCP - Q6 ////////////////////
 
-    folder_contents = opendir(".");
-    if(folder_contents == NULL){
-        printf("Unable to read from directory");
-        return;
-    }else{
-        while( (file_name = readdir(folder_contents))){
-            if (stat(file_name->d_name, &is_runnable) == 0 && is_runnable.st_mode & S_IXUSR){ 
-                if(strncmp(file_name->d_name,".",1) == 0){
-                    /*Starts with '.' , so color is pruple */
-                    printf(PURPLE);
-                    printf("%s\n",file_name->d_name);
-                }else{
-                    /* executable file so we change its color to green */
-                    printf(GREEN); // change color to green
-                    printf("%s\n",file_name->d_name);
-                }
-                printf(WHITE);
-            }
-            else {
-                /* non-executable, stays the same (white) */
-                printf("%s\n",file_name->d_name);
-            }
-                
-            
-            idx++;
-        }
-    }
-
-    free(file_name);
-    closedir(folder_contents);
-}
-
-void open_tcp_socket(){
+void open_tcp_socket(char * port, char * IP){
 
     struct sockaddr_in server_addr;
 
-    // opening the client socket.
     cli_sock = socket(AF_INET, SOCK_STREAM,0);
     if( cli_sock < 0 ) {
         printf("Socket creation failed, exiting method...\n");
@@ -436,13 +289,11 @@ void open_tcp_socket(){
     }
 
     bzero(&server_addr, sizeof(server_addr)); // reset the buff.
-
-    // enter ip,port
+    unsigned int val = strtoul(port, port + strlen(port), 10);
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr(LOCALHOST); // local host
-    server_addr.sin_port = htons(PORT);
+    server_addr.sin_addr.s_addr = inet_addr(IP); // ip that the user put
+    server_addr.sin_port = htons(val);
     
-    // trying to establish connections.
     int con = connect(cli_sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
     if (con != 0){
         printf("Connection with server failed, exiting method...\n");
@@ -453,152 +304,137 @@ void open_tcp_socket(){
     }
 }
 
-void get_curr_directory(){
-
-    long size;
-    char *buf;
-    char *curr_dir = NULL;
-    size = pathconf(".",_PC_PATH_MAX);
-    if((buf = (char*)malloc((size_t)size))!=NULL){
-        curr_dir = getcwd(buf,(size_t)size);
-    }
-    printf("%s",curr_dir);
-
-    /*FREE*/
-    free(buf);
-}
-
-void print_echo_msg(char *return_echo){
-
-    /** 
-     * i forwad the pointer by 4.
-     * this is because i have no need to see the 'ECHO' in reply.
-     */
-    return_echo+=5;
-    printf("%s",return_echo);
-}
-// Function to take input
-// int takeInput(char* str)
-// {
-//     char* buf;
-  
-//     buf = readline("\n>>> ");
-//     if (strlen(buf) != 0) {
-//         add_history(buf);
-//         strcpy(str, buf);
-//         return 0;
-//     } else {
-//         return 1;
-//     }
-// }
 void main(){
 
-    char buf[500],*buffer[100],buf2[500],buf3[500], *params1[100],*params2[100],*token,cwd[1024];
-	int nr=0;
-	printf("*****************************************************************"    "\n");
-	printf("**************************CUSTOM SHELL***************************"    "\n");
+    char buf[256],*buffer[256],*buffer2[256], *params1[100],cwd[256];
+	int index=0;
+	printf("***********************************************************************************"    "\n");
+	printf("************************** WALCOME TO GAL & ITZIK SHELL ***************************"    "\n");
 
 	while(1){
-		printf("Enter command(or 'exit' to exit):""\n");
+		printf("Enter 'exit' to exit):""\n");
 
 		//print current Directory
-		if (getcwd(cwd, sizeof(cwd)) != NULL)
-		printf( "%s  " , cwd);
-		else 	perror("getcwd failed\n");
+		if (getcwd(cwd, sizeof(cwd)) != NULL){
+		    printf( "%s  " , cwd);
+        }
+		else{
+            perror("getcwd failed\n");
+
+        } 	
 
 		//read user input
-		fgets(buf, 500, stdin);//buffer overflow cannot happen
+		fgets(buf,256,stdin);//buffer overflow cannot happen
 
-		//check if only a simple command needs to be executed or multiple piped commands or other types
 		if(strchr(buf,'|')){//tokenize pipe commands
-			tokenize_buffer(buffer,&nr,buf,"|");
-			executePiped(buffer,nr);
+			tokenize_buffer(buffer,&index,buf,"|");
+			executePiped(buffer,index);
 		}
-		else if(strchr(buf,'&')){//asyncronous execution
-			tokenize_buffer(buffer,&nr,buf,"&");
-			executeAsync(buffer,nr);
-		}
-		else if(strstr(buf,">>")){//append output to file
-			tokenize_buffer(buffer,&nr,buf,">>");
-			if(nr==2)executeRedirect(buffer,nr,APPEND);
-			else printf("Incorrect output redirection!(has to to be in this form: command >> file)");
-		}
+
 		else if(strchr(buf,'>')){//redirect output to file
-			tokenize_buffer(buffer,&nr,buf,">");
-			if(nr==2)executeRedirect(buffer,nr, OUTPUT);
-			else printf("Incorrect output redirection!(has to to be in this form: command > file)");
+			tokenize_buffer(buffer,&index,buf,">");
+			if(index==2){
+                executeRedirect(buffer,index, OUTPUT);
+            }
+			else{ 
+                printf("Incorrect output redirection!");
+            }
 		}
+
 		else if(strchr(buf,'<')){//redirect file to input
-			tokenize_buffer(buffer,&nr,buf,"<");
-			if(nr==2)executeRedirect(buffer,nr, INPUT);
-			else printf("Incorrect input redirection!(has to to be in this form: command < file)");
+			tokenize_buffer(buffer,&index,buf,"<");
+			if(index==2){
+                executeRedirect(buffer,index, INPUT);
+            }
+			else{
+                 printf("Incorrect input redirection!(has to to be in this form: command < file)");
+            }
 		}
-		else{//single command including internal ones
-			tokenize_buffer(params1,&nr,buf," ");
-			if(strstr(params1[0],"cd")){//cd builtin command
-				chdir(params1[1]);
+        else if(strchr(buf,'}')){  // open a tcp port
+        	tokenize_buffer(buffer,&index,buf," ");
+            tokenize_buffer(buffer2,&index,buffer[2],":");
+
+            open_tcp_socket(buffer2[1], buffer2[0]);
+            dup2(1234,1);
+
+			if(strstr(buffer[0],"DIR")){
+                show_library_files();
 			}
-			// else if(strstr(params1[0],"help")){//help builtin command
-			// 	showHelp();
-			// }
+            else if(strstr(buffer[0],"COPY")){
+				copy_from_src_to_dst(buffer[1],buffer[2]);        
+
+		    }
+			else if(strstr(buffer[0],"exit")){//exit builtin command
+				exit(0);
+			}
+			else original(buffer); // everything else command 
+
+        }
+        else if(strchr(buf,'{')){  // open a sever port
+            tokenize_buffer(buffer,&index,buf," ");
+            char * port = buffer[1];
+
+            unsigned int val = strtoul(port, port + strlen(port), 10);
+            int sockfd, connfd, len;
+            struct sockaddr_in servaddr, cli;
+            sockfd = socket(AF_INET, SOCK_STREAM, 0);
+            if (sockfd == -1) {
+                printf("socket creation failed...\n");
+                exit(0);
+            }
+            else
+                printf("Socket successfully created..\n");                
+            bzero(&servaddr, sizeof(servaddr));
+            
+            servaddr.sin_family = AF_INET;
+            servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+            servaddr.sin_port = htons(val);
+            
+            if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) {
+                printf("socket bind failed...\n");
+                exit(0);
+            }
+            else
+                printf("Socket successfully binded..\n");
+        
+            if ((listen(sockfd, 5)) != 0) {
+                printf("Listen failed...\n");
+                exit(0);
+            }
+            else
+                printf("Server listening..\n");
+            len = sizeof(cli);
+            
+            connfd = accept(sockfd, (SA*)&cli, &len);
+            if (connfd < 0) {
+                printf("server accept failed...\n");                    
+                exit(0);
+            }
+            else
+                printf("server accept the client...\n");
+            
+            func(connfd);
+            
+            close(sockfd);
+            dup2(1,1234);
+            dup2(cli_sock,1);
+        }
+
+		else{
+			tokenize_buffer(params1,&index,buf," ");
+			if(strstr(params1[0],"DIR")){
+                show_library_files();
+			}
+            else if(strstr(params1[0],"COPY")){
+				copy_from_src_to_dst(params1[1],params1[2]);        
+
+		    }
 			else if(strstr(params1[0],"exit")){//exit builtin command
 				exit(0);
 			}
-			// else executeBasic(params1);
+			else original(params1); // everything else command 
+
 		}
 	}
-
-	return 0;
-
-
-
-    // char inputstring[1000], *parsedArgs[100];
-    // char* paredArgsPiped[100];
-    // int execFlag = 0;
-    // char *inputString;
-    // inputString = (char*) malloc(MAXSIZE*sizeof(char));
-    // shell_initialize();
-    // // printf("%s", "380");
-    // struct utsname os_type;
-    // uname(&os_type); // name finds.
-
-    // while(TRUE){
-  
-    //     printf("%s",getenv("USER")); // username.
-    //     printf("@%s",os_type.nodename);
-    //     printf(":");
-    //     printf("~");
-    //     printf("$ ");
-
-    //     // printf("inputstring%s ", inputstring);
-    //     // printf("parsedArgs%s%s ", parsedArgs);
-    //     // printf("pa")
-        
-    //     bzero(inputString, strlen(inputString));
-    //     fgets(inputString,MAXSIZE,stdin);
-        
-    //     inputString[strcspn(inputString,"\n")] = 0;
-    //     // printf("inputString %s\n", inputString);
-    //     execFlag = processString(inputString, parsedArgs, paredArgsPiped);
-    //     // if(takeInput(inputstring))
-    //     //     continue;
-    //     // printf("parsedArgs %s\n", parsedArgs);
-    //     // printf("paredArgsPiped %s\n ", paredArgsPiped);
-    //     // printf("execFlag %d \n", execFlag);
-    //     if (execFlag == 2)
-    //     {
-    //         printf("535\n");
-    //         execArgsPiped(parsedArgs, paredArgsPiped);
-    //         // printf("484");
-    //         // exit(1);
-    //         // return;
-    //         // continue;;
-    //     }
-    //     else{
-    //         printf("493");
-    //         user_input(inputString);
-    //     }
-    // }
-    // free(inputString);
 
 }
