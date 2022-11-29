@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <stdio.h>
 
+//https://dev.to/0xbf/implement-tee-cli-in-c-c-lang-2p5c
+
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         fprintf(stderr, "%s\n", "Output file name required");
